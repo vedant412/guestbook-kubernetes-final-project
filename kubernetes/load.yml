@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: guestbook-load-
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 30
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: load
+          image: busybox:1.36.1
+          command:
+            - /bin/sh
+            - -c
+            - |
+              for worker in 1 2 3 4; do
+                (
+                  while true; do
+                    wget -T 2 -q -O /dev/null http://guestbook:3000/
+                    sleep 0.02
+                  done
+                ) &
+              done
+              wait
+          resources:
+            requests:
+              cpu: 30m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 32Mi

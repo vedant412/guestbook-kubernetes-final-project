@@ -1,5 +1,4 @@
 $(document).ready(function() {
-  var headerTitleElement = $("#header h1");
   var entriesElement = $("#guestbook-entries");
   var formElement = $("#guestbook-form");
   var submitElement = $("#guestbook-submit");
@@ -9,24 +8,24 @@ $(document).ready(function() {
   var appendGuestbookEntries = function(data) {
     entriesElement.empty();
     $.each(data, function(key, val) {
-      entriesElement.append("<p>" + val + "</p>");
+      $("<p>").text(val).appendTo(entriesElement);
     });
   }
 
   var handleSubmission = function(e) {
     e.preventDefault();
-    var entryValue = entryContentElement.val()
+    var entryValue = entryContentElement.val().trim();
     if (entryValue.length > 0) {
       entriesElement.append("<p>...</p>");
-      $.getJSON("rpush/guestbook/" + entryValue, appendGuestbookEntries);
-	  entryContentElement.val("")
+      $.getJSON("rpush/guestbook/" + encodeURIComponent(entryValue), appendGuestbookEntries);
+      entryContentElement.val("");
     }
     return false;
   }
 
   submitElement.click(handleSubmission);
   formElement.submit(handleSubmission);
-  hostAddressElement.append(document.URL);
+  hostAddressElement.text(document.URL);
 
   // Poll every second.
   (function fetchGuestbook() {

@@ -19,11 +19,12 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
-	"strings"
+	"sync"
 
-	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
+	"github.com/urfave/negroni"
 	"github.com/xyproto/simpleredis/v2"
 )
 
@@ -33,7 +34,8 @@ var (
 	slavePool  *simpleredis.ConnectionPool
 
 	// For when Redis is not used, we just keep it in memory
-	lists map[string][]string = map[string][]string{}
+	listsMu sync.RWMutex
+	lists   = map[string][]string{}
 )
 
 type Input struct {
@@ -58,7 +60,9 @@ func GetList(key string) ([]string, error) {
 	}
 
 	// if neither exist, we're probably in "in-memory" mode
-	return lists[key], nil
+	listsMu.RLock()
+	defer listsMu.RUnlock()
+	return append([]string{}, lists[key]...), nil
 }
 
 func AppendToList(item string, key string) ([]string, error) {
@@ -74,9 +78,10 @@ func AppendToList(item string, key string) ([]string, error) {
 			return nil, err
 		}
 	} else {
-		items = lists[key]
-		items = append(items, item)
-		lists[key] = items
+		listsMu.Lock()
+		defer listsMu.Unlock()
+		lists[key] = append(lists[key], item)
+		items = append([]string{}, lists[key]...)
 	}
 	return items, nil
 }
@@ -100,7 +105,11 @@ func ListPushHandler(rw http.ResponseWriter, req *http.Request) {
 	var data []byte
 
 	key := mux.Vars(req)["key"]
-	value := mux.Vars(req)["value"]
+	value, decodeErr := url.PathUnescape(mux.Vars(req)["value"])
+	if decodeErr != nil {
+		http.Error(rw, "Invalid guestbook entry", http.StatusBadRequest)
+		return
+	}
 
 	items, err := AppendToList(value, key)
 
@@ -130,23 +139,6 @@ func InfoHandler(rw http.ResponseWriter, req *http.Request) {
 		info = "In-memory datastore (not redis)"
 	}
 	rw.Write([]byte(info + "\n"))
-}
-
-func EnvHandler(rw http.ResponseWriter, req *http.Request) {
-	environment := make(map[string]string)
-	for _, item := range os.Environ() {
-		splits := strings.Split(item, "=")
-		key := splits[0]
-		val := strings.Join(splits[1:], "=")
-		environment[key] = val
-	}
-
-	data, err := json.MarshalIndent(environment, "", "")
-	if err != nil {
-		data = []byte("Error marshalling env vars: " + err.Error())
-	}
-
-	rw.Write(data)
 }
 
 func HelloHandler(rw http.ResponseWriter, req *http.Request) {
@@ -181,11 +173,10 @@ func main() {
 		defer slavePool.Close()
 	}
 
-	r := mux.NewRouter()
+	r := mux.NewRouter().UseEncodedPath()
 	r.Path("/lrange/{key}").Methods("GET").HandlerFunc(ListRangeHandler)
 	r.Path("/rpush/{key}/{value}").Methods("GET").HandlerFunc(ListPushHandler)
 	r.Path("/info").Methods("GET").HandlerFunc(InfoHandler)
-	r.Path("/env").Methods("GET").HandlerFunc(EnvHandler)
 	r.Path("/hello").Methods("GET").HandlerFunc(HelloHandler)
 
 	n := negroni.Classic()
