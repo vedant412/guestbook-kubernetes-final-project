@@ -1,0 +1,25 @@
+name: Verify Guestbook on Kubernetes
+
+on:
+  push:
+    branches: [ci/guestbook-verification]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify both images, autoscaling, rollout and rollback
+        run: bash ci/verify-guestbook.sh
+      - name: Emit the terminal evidence archive
+        if: always()
+        run: |
+          if [ -d verification-evidence ]; then
+            printf 'GUESTBOOK_EVIDENCE_BEGIN\n'
+            tar -cz -C verification-evidence . | base64 -w0
+            printf '\nGUESTBOOK_EVIDENCE_END\n'
+          fi
