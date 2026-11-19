@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import re
 from shlex import join
-from shutil import copyfile, copytree
+from shutil import copyfile, copytree, make_archive
 import subprocess
 from tempfile import TemporaryDirectory
 import time
@@ -87,7 +87,7 @@ def collect(namespace):
     ).strip()
     if existing:
         raise RuntimeError(f"Existing guestbook resources in {namespace}:\n{existing}")
-    registry = run("ibmcloud", "cr", "images", "--restrict", repository, timeout=45)
+    registry = run("ibmcloud", "cr", "images", "--restrict", namespace, timeout=45)
     if re.search(rf"(?m)^[ \t]*{re.escape(repository)}[ \t]+v[12]\b", registry):
         raise RuntimeError(f"The registry already contains {repository}:v1 or :v2.")
     run("ibmcloud", "cr", "login", timeout=45)
@@ -101,7 +101,7 @@ def collect(namespace):
     print("Starting v1 image build", flush=True)
     run("docker", "build", "-t", image_v1, str(V1), timeout=600)
     run("docker", "push", image_v1)
-    command = ("ibmcloud", "cr", "images", "--restrict", repository)
+    command = ("ibmcloud", "cr", "images", "--restrict", namespace)
     registry = run(*command)
     if not re.search(rf"(?m)^[ \t]*{re.escape(repository)}[ \t]+v1\b", registry):
         raise RuntimeError("The IBM Container Registry listing did not show the v1 tag.")
@@ -176,6 +176,8 @@ def collect(namespace):
             raise RuntimeError("Expected two ReplicaSets and one scaled to zero following rollback.")
         record(directory, "rs", *rs)
 
+    archive = make_archive(str(directory), "zip", root_dir=directory)
+    print(f"Evidence ZIP: {archive}", flush=True)
     if autoscale_error is not None:
         raise RuntimeError(f"Saved the other evidence to {directory}. Task 5 remains pending.")
     print(f"Evidence complete: {directory}", flush=True)

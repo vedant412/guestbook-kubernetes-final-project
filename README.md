@@ -5,7 +5,8 @@ regular page title and the v2 image changes both the browser title and the headi
 Kubernetes scales the workload using a CPU-based Horizontal Pod Autoscaler, rolls the
 deployment to v2 with lower CPU requests and limits, then rolls back to v1.
 
-The application builds on the [IBM Skills Network starter](https://github.com/ibm-developer-skills-network/guestbook).
+The application builds on the [IBM Skills Network starter](https://github.com/ibm-developer-skills-network/guestbook)
+and follows the [Guestbook lab instructions](https://cf-courses-data.static.labs.skills.network/g6haPxvVsEJqFaCYdGroNw/instructions-Mark-v1.md).
 The standalone deployment stores entries in memory per pod. The starter's optional Redis
 support remains available when its Redis services are configured.
 
